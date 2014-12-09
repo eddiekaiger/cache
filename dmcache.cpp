@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 using namespace std;
 
@@ -16,47 +17,47 @@ class CacheLine {
 
 private:
 	char tag;			// 8 bits long
-	unsigned int dirty; // 0 or 1 (boolean)
-	string data;		// 4 bytes (8 hex values)	
+	unsigned int dirty;	// 0 or 1 (boolean)
+	string data[8];		// 4 bytes (8 hex values)	
 
 public:
 	// Constructor
 	CacheLine() {
 		tag = -1;
 		dirty = 0;
-		data = "00000000";
+		for (int i = 0; i < 4; i++) {
+			data[i] = "00";
+		}
 	}
 
 	// Getters
 	char getTag() const { return tag; };
 	unsigned int isDirty() const { return dirty; };
-	string getData() const { return data; };
+	string getOffset(int offset) const { return data[offset]; };
 
 	// Setters
 	void setTag(char t) { tag = t; };
-	void setDirty(unsigned int d) { dirty = d; };
-	void setData(string str) { data = str; };
+	void setDirty() { dirty = 1; };
+	void clearDirty() { dirty = 0; };
+	void setOffset(int offset, string str) { data[offset] = str; };
 
 	// Write
-	void write(char tag, string data, unsigned int offset) {		
-		dirty = 1;			// Set dirty bit
-		this->tag = tag;	// Set tag
-
+	void write(string data, unsigned int offset) {		
+		setDirty();
 		// Replace the data corresponding to the offset
-		this->data.replace(offset * 2, 2, data);
+		this->data[offset] = data;
 	}
 
 	// Print
-	void print(char newTag ostream& output, unsigned int offset) {
-		int hit_miss = tag == newTag ? 1 : 0;
-		string dataString = data.substr(offset * 2, 2);
-		output << dataString << " " << hit_miss << " " << dirty << endl;
+	void print(int hit_miss, ostream& output, unsigned int offset) {
+		output << getOffset(offset) << " " << hit_miss << " " << dirty << endl;
 	}
 
 	// Overrode << operator for debugging
 	friend ostream& operator << (ostream& output, const CacheLine& line) {
-		output << "Tag:" << (int)line.getTag() << " Dirty:" << line.getDirty() 
-				<< " Data:" << line.getData() << endl;
+		output << "Tag:" << (int)line.getTag() << " Dirty:" << line.isDirty() 
+				<< " Data:" << line.getOffset(0) << line.getOffset(1) 
+				<< line.getOffset(2) << line.getOffset(3) << endl;
 		return output;
 	}
 };
@@ -94,40 +95,60 @@ int main(int argc, char *argv[]) {
 		string data = str.substr(8,2);
 
 		// Decode address string
-		unsigned int address = stoul(addr, nullptr, 16);
-		char tag = stoul(addr.substr(0,2), nullptr, 16);
-		unsigned char line_offset = stoul(addr.substr(2,2), nullptr, 16);
-		unsigned int offset = line_offset & 3;
-		unsigned int line = ((int)line_offset >> 2);
+
+		stringstream ss;
+		ss << hex << addr;
+		unsigned int address;
+		ss >> address;
+
+		char tag = (address >> 8);
+		unsigned int line = (address & 0xFF) >> 2;
+		unsigned int offset = address & 3;
 
 		// Determine if we need to evict from cache
+
+		int hit_miss = 1;
+
 		if (tag != cache[line].getTag()) {
-			// If it's dirty, we need to write back to memory first!
+
+			// It's a miss
+			hit_miss = 0;
+
+			// If previous line is dirty, we need to write back to memory first!
 			if (cache[line].isDirty()) {
+				
+				// we need old tag's address
+				int offsetStart = (cache[line].getTag() << 8) | (line << 2);
 
+				memory[offsetStart] = cache[line].getOffset(0);
+				memory[offsetStart+1] = cache[line].getOffset(1);
+				memory[offsetStart+2] = cache[line].getOffset(2);
+				memory[offsetStart+3] = cache[line].getOffset(3);
 			}
+
+			// Read line from RAM
+			int ramAddrStart = address - offset;
+			cache[line].setOffset(0, memory[ramAddrStart]);
+			cache[line].setOffset(1, memory[ramAddrStart+1]);
+			cache[line].setOffset(2, memory[ramAddrStart+2]);
+			cache[line].setOffset(3, memory[ramAddrStart+3]);
+
+			// Set tag, clear dirty
+			cache[line].setTag(tag);
+			cache[line].clearDirty();
+
 		}
-
-
 
 		// Determine if read or write
 
 		if (rw == "FF") { 	// WRITING
-			
-			// Write to main memory
-			memory[address] = data;
 
 			// Write to cache			
-			cache[line].write(tag, data, offset);
+			cache[line].write(data, offset);
 			
 		} else {			// READING
 
-			cache[line].print(tag, outputFile, offset);
-
-			// If we get a miss, bring in line from memory
-			if (cache[line].getTag() != tag) {
-				
-			}
+			cache[line].print(hit_miss, outputFile, offset);
 
 		}
 
