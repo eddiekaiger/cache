@@ -55,7 +55,7 @@ public:
 
 	// Overrode << operator for debugging
 	friend ostream& operator << (ostream& output, const CacheLine& line) {
-		output << "Tag:" << (int)line.getTag() << " Dirty:" << line.isDirty() 
+		output << "Tag:" << (int)(unsigned char)line.getTag() << " Dirty:" << line.isDirty() 
 				<< " Data:" << line.getOffset(0) << line.getOffset(1) 
 				<< line.getOffset(2) << line.getOffset(3) << endl;
 		return output;
@@ -84,6 +84,7 @@ int main(int argc, char *argv[]) {
 
 	// Read input data
 	string str;
+	int count = 0;
 	while (getline (inputFile, str)) {
 
 		// CacheLine Format = ADDR RW DT
@@ -118,7 +119,9 @@ int main(int argc, char *argv[]) {
 			if (cache[line].isDirty()) {
 				
 				// we need old tag's address
-				int offsetStart = (cache[line].getTag() << 8) | (line << 2);
+				int offsetStart = (((int)(unsigned char)(cache[line].getTag())) << 8) | (line << 2);
+
+				cout << "Offset Start: " << offsetStart << endl;
 
 				memory[offsetStart] = cache[line].getOffset(0);
 				memory[offsetStart+1] = cache[line].getOffset(1);
@@ -152,8 +155,12 @@ int main(int argc, char *argv[]) {
 
 		}
 
+		cout << "Line #: " << line << endl;
+
 		cout << cache[line] << endl;
 
+
+		count++;
 	}
 
 	// Close files
