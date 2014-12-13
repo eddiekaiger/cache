@@ -18,7 +18,7 @@ class CacheLine {
 private:
 	char tag;			// 8 bits long
 	unsigned int dirty;	// 0 or 1 (boolean)
-	string data[8];		// 4 bytes (8 hex values)	
+	string data[4];		// 4 bytes (8 hex values)	
 
 public:
 	// Constructor
@@ -31,15 +31,15 @@ public:
 	}
 
 	// Getters
-	char getTag() const { return tag; };
-	unsigned int isDirty() const { return dirty; };
-	string getOffset(int offset) const { return data[offset]; };
+	char getTag() const { return tag; }
+	unsigned int isDirty() const { return dirty; }
+	string getOffset(int offset) const { return data[offset]; }
 
 	// Setters
-	void setTag(char t) { tag = t; };
-	void setDirty() { dirty = 1; };
-	void clearDirty() { dirty = 0; };
-	void setOffset(int offset, string str) { data[offset] = str; };
+	void setTag(char t) { tag = t; }
+	void setDirty() { dirty = 1; }
+	void clearDirty() { dirty = 0; }
+	void setOffset(int offset, string str) { data[offset] = str; }
 
 	// Write
 	void write(string data, unsigned int offset) {		
@@ -84,7 +84,6 @@ int main(int argc, char *argv[]) {
 
 	// Read input data
 	string str;
-	int count = 0;
 	while (getline (inputFile, str)) {
 
 		// CacheLine Format = ADDR RW DT
@@ -102,6 +101,7 @@ int main(int argc, char *argv[]) {
 		unsigned int address;
 		ss >> address;
 
+		// Generate tag, line & offset
 		char tag = (address >> 8);
 		unsigned int line = (address & 0xFF) >> 2;
 		unsigned int offset = address & 3;
@@ -154,13 +154,6 @@ int main(int argc, char *argv[]) {
 			cache[line].print(hit_miss, outputFile, offset);
 
 		}
-
-		cout << "Line #: " << line << endl;
-
-		cout << cache[line] << endl;
-
-
-		count++;
 	}
 
 	// Close files
